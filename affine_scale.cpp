@@ -34,3 +34,8 @@ void Affinine::printSolution() const {
     cout << "Final solution:\n" << x.transpose() << endl;
     cout << "Objective value: " << c.dot(x) << endl;
 }
+
+bool Affinine::isFeasible(const VectorXd& x) const {
+    // stub for feasibility checks
+    return true;
+}
