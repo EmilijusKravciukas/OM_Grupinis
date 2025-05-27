@@ -1,1 +1,1 @@
-g++ tests.cpp affine_scale.cpp -o exe
+g++ tests.cpp affine_scale.cpp simplex.cpp -o exe

@@ -19,7 +19,6 @@ public:
     double getObjectiveValue() const;
     void printSolution() const;
 
-
 private:
     MatrixXd A; // Pilna simpleksine matrica su slackais
     VectorXd b; // Tiesiog apribojimu rezultatu vektorius
