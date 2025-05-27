@@ -47,6 +47,7 @@ void runSimplexTest(const std::string& name, const MatrixXd& A, const VectorXd& 
 }
 
 int main() {
+
       // ---------- Test 0: Original ----------
       MatrixXd A0(3, 4);
       A0 << -1, 1, -1, -1,
