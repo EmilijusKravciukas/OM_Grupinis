@@ -1,10 +1,44 @@
-#include <iostream>
+#include "affine_scale.h"  // Your affine solver header
+#include "simplex.h" // Your Simplex solver implementation
+
+#include <Eigen/Dense>
 #include <vector>
-#include <iomanip>
-#include <cmath>
+#include <iostream>
 #include <string>
 
 using namespace std;
+using namespace Eigen;
+
+// Affine Solver Wrapper
+void runAffineTest(const string& name, const MatrixXd& A, const VectorXd& b, const VectorXd& c, const vector<char>& constraints) {
+    cout << "\n===== [Affine Solver] Test: " << name << " =====\n";
+    Affinine solver(0.5, 1e-6, 1000);
+    solver.setupProblem(A, b, c, constraints);
+    solver.solve();
+    solver.printSolution();
+}
+
+// Simplex Solver Wrapper
+void runSimplexTest(const string& name, const MatrixXd& A, const VectorXd& b, const VectorXd& c) {
+    cout << "\n===== [Simplex Solver] Test: " << name << " =====\n";
+
+    vector<vector<double>> A_vec(A.rows(), vector<double>(A.cols()));
+    for (int i = 0; i < A.rows(); ++i)
+        for (int j = 0; j < A.cols(); ++j)
+            A_vec[i][j] = A(i, j);
+
+    vector<double> b_vec(b.data(), b.data() + b.size());
+    vector<double> c_vec(c.data(), c.data() + c.size());
+
+    Simplex solver(c_vec, A_vec, b_vec);
+    solver.calculate();
+}
+
+// Shared runner
+void runTest(const string& name, const MatrixXd& A, const VectorXd& b, const VectorXd& c, const vector<char>& constraints) {
+    runAffineTest(name, A, b, c, constraints);
+    runSimplexTest(name, A, b, c);
+}
 
 class Simplex{
 private:
