@@ -7,6 +7,8 @@
 using namespace Eigen;
 using namespace std;
 
+# Comment
+
 class KarmarkarSolver {
 private:
     MatrixXd A;
