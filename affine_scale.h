@@ -1,30 +1,31 @@
-#ifndef AFFINE_SCALE_H
-#define AFFINE_SCALE_H
+#pragma once
 
 #include <Eigen/Dense>
+#include <iostream>
 #include <vector>
+#include <iomanip>
 
-using Eigen::MatrixXd;
-using Eigen::VectorXd;
-using std::vector;
+using namespace std;
+using namespace Eigen;
 
 class Affinine {
 public:
-    Affinine(double alpha = 0.5, double tol = 1e-6, int maxIter = 1000);
-
+    Affinine(double gamma = 0.5, double epsilon = 1e-6, int max_iter = 1000);
     void setupProblem(const MatrixXd& A, const VectorXd& b, const VectorXd& c, const vector<char>& constraints);
+    void initFeasiblePoint();
     bool solve();
+    VectorXd computeDescentDirection(const VectorXd& x_k);
+    VectorXd getSolution() const;
+    double getObjectiveValue() const;
     void printSolution() const;
 
+
 private:
-    MatrixXd A;
-    VectorXd b, c, x;
-    vector<char> constraints;
-    double alpha, tol;
-    int maxIter;
-
-    // Optional: internal helpers
-    bool isFeasible(const VectorXd& x) const;
+    MatrixXd A; // Pilna simpleksine matrica su slackais
+    VectorXd b; // Tiesiog apribojimu rezultatu vektorius
+    VectorXd c; // Musu tikslo funkcijos koeficientu vektorius su slackais
+    VectorXd x; // taskas
+    double gamma; // spindulio (zingsnio) ilgis. Kitur zymima y
+    double epsilon; // bendra paklaida
+    int max_iterations; // kiek iteraciju sukasi
 };
-
-#endif
