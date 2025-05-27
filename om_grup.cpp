@@ -7,103 +7,69 @@
 using namespace Eigen;
 using namespace std;
 
-class KarmarkarSolver {
+class Affinine {
 private:
-    MatrixXd A;
-    VectorXd b;
-    VectorXd c;
-    VectorXd x;
-    double gamma;
-    double epsilon;
-    int max_iterations;
+    MatrixXd A; // Pilna simpleksine matrica su slackais
+    VectorXd b; // Tiesiog apribojimu rezultatu vektorius
+    VectorXd c; // Musu tikslo funkcijos koeficientu vektorius su slackais
+    VectorXd x; // taskas
+    double gamma; // spindulio (zingsnio) ilgis. Kitur zymima y
+    double epsilon; // bendra paklaida
+    int max_iterations; // kiek iteraciju sukasi
 
 public:
-    KarmarkarSolver(double gamma = 0.5, double epsilon = 1e-6, int max_iter = 1000)
-        : gamma(gamma), epsilon(epsilon), max_iterations(max_iter) {}
+    Affinine(double gamma = 0.5, double epsilon = 1e-6, int max_iter = 1000) : gamma(gamma), epsilon(epsilon), max_iterations(max_iter) {
+    }
 
-    // Convert inequality constraints to standard form
-    void setupProblem(const MatrixXd& A_orig, const VectorXd& b_orig, const VectorXd& c_orig,
-        const vector<char>& constraint_types) {
-        int m = A_orig.rows();
-        int n = A_orig.cols();
+    void setupProblem(const MatrixXd& A_orig, const VectorXd& b_orig, const VectorXd& c_orig, const vector<char>& constraint_types) {
+        int ProblemRows = A_orig.rows();
+        int ProblemColumns = A_orig.cols();
 
-        // Count slack variables needed
         int slack_vars = 0;
         for (char type : constraint_types) {
             if (type == '<' || type == 'L') slack_vars++;
         }
 
-        // Setup matrices with slack variables
-        A = MatrixXd::Zero(m, n + slack_vars);
-        A.leftCols(n) = A_orig;
+        A = MatrixXd::Zero(ProblemRows, ProblemColumns + slack_vars);
+        A.leftCols(ProblemColumns) = A_orig;
 
         b = b_orig;
-        c = VectorXd::Zero(n + slack_vars);
-        c.head(n) = c_orig;
+        c = VectorXd::Zero(ProblemColumns + slack_vars);
+        c.head(ProblemColumns) = c_orig;
 
-        // Add slack variables for inequality constraints
-        int slack_idx = 0;
-        for (int i = 0; i < m; i++) {
+        int slack_id = 0;
+        for (int i = 0; i < ProblemRows; i++) {
             if (constraint_types[i] == '<' || constraint_types[i] == 'L') {
-                A(i, n + slack_idx) = 1.0;
-                slack_idx++;
+                A(i, ProblemColumns + slack_id) = 1.0;
+                slack_id++;
             }
         }
-
-        // Initialize feasible starting point
-        initializeFeasiblePoint();
+        initFeasiblePoint();
     }
 
-    void initializeFeasiblePoint() {
+    void initFeasiblePoint() {
         int n = A.cols();
-        x = VectorXd::Constant(n, 1.0); // start with a positive vector
+        x = VectorXd::Constant(n, 1.0);
 
         for (int iter = 0; iter < 100; ++iter) {
             VectorXd Ax = A * x;
             VectorXd violation = Ax - b;
 
-            // If feasible, we're done
             if (violation.maxCoeff() <= epsilon) {
-                cout << "Feasible starting point found after " << iter << " iterations." << endl;
+                cout << "Starting point found after " << iter << " iterations." << endl;
                 return;
             }
 
-            // Project violation back toward feasibility
+            //Idealiai gauname pazeidimu vektoriu, kuri atemus is x vektoriaus gausime reiksmes, kurios neturi pazeidimu, tokiu atveju toliau seka skaiciavimai su matrica A.
             VectorXd adjustment = A.transpose() * ((A * A.transpose()).ldlt().solve(violation));
             x -= adjustment;
 
-            // Ensure positivity
             for (int i = 0; i < x.size(); ++i) {
                 if (x(i) <= 0) x(i) = 1e-3;
             }
         }
 
         cout << "Warning: Could not find a strictly feasible point. Proceeding with best effort." << endl;
-    }
-
-    // Projective transformation
-    VectorXd projectiveTransform(const VectorXd& x_k) {
-        VectorXd D_inv = x_k.cwiseInverse();
-        VectorXd x_prime = VectorXd::Ones(x_k.size());
-
-        for (int i = 0; i < x_k.size(); i++) {
-            x_prime(i) = 1.0 / x_k(i);
-        }
-        x_prime = x_prime / x_prime.sum() * x_k.size();
-
-        return x_prime;
-    }
-
-    // Inverse transformation  
-    VectorXd inverseTransform(const VectorXd& x_prime, const VectorXd& x_k) {
-        VectorXd x_new(x_k.size());
-        double sum_x_prime = x_prime.sum();
-
-        for (int i = 0; i < x_k.size(); i++) {
-            x_new(i) = x_k(i) * x_prime(i) / sum_x_prime;
-        }
-
-        return x_new;
     }
 
     // Compute steepest descent direction in transformed space
@@ -138,7 +104,7 @@ public:
     }
 
     bool solve() {
-        cout << "Starting Karmarkar's Algorithm..." << endl;
+        cout << "Starting Affinine Algorithm..." << endl;
         cout << "Initial point: " << x.transpose() << endl;
         cout << "Initial objective value: " << c.dot(x) << endl << endl;
 
@@ -162,8 +128,17 @@ public:
                 return true;
             }
 
-            // Update point using step size gamma
-            VectorXd x_new = x + gamma * x.cwiseProduct(direction);
+            VectorXd step = x.asDiagonal() * direction;
+
+            // Compute maximum safe step to stay in feasible region
+            double alpha = 1.0;
+            for (int i = 0; i < x.size(); ++i) {
+                if (step(i) < 0) {
+                    alpha = std::min(alpha, -0.99 * x(i) / step(i));
+                }
+            }
+
+            VectorXd x_new = x + std::min(gamma, alpha) * step;
 
             // Ensure feasibility and positivity
             double min_val = x_new.minCoeff();
@@ -171,13 +146,6 @@ public:
                 double alpha = 0.99 * x.cwiseQuotient(-direction).minCoeff();
                 if (alpha > 0 && alpha < gamma) {
                     x_new = x + alpha * x.cwiseProduct(direction);
-                }
-            }
-
-            // Ensure all components remain positive
-            for (int i = 0; i < x_new.size(); i++) {
-                if (x_new(i) <= 0) {
-                    x_new(i) = 1e-8;
                 }
             }
 
@@ -230,36 +198,38 @@ int main() {
     // x3 + x4 ≤ 3
     // xi ≥ 0
 
-    // Coefficient matrix (without slack variables)
-    MatrixXd A_orig(3, 4);
-    A_orig << -1, 1, -1, -1,
+    // Koeficientu Matrica apribojimams
+    MatrixXd A(3, 4);
+    A << -1, 1, -1, -1,
         2, 4, 0, 0,
         0, 0, 1, 1;
 
-    // Right-hand side
-    VectorXd b_orig(3);
-    b_orig << 8, 10, 3;
+    // Apribojimu reiksmes
+    VectorXd Res(3);
+    Res << 8, 10, 3;
 
-    // Objective coefficients  
-    VectorXd c_orig(4);
-    c_orig << 2, -3, 0, -5;
+    // Tikslo funkcijos koeficientai  
+    VectorXd coeffs(4);
+    coeffs << 2, -3, 0, -5;
 
-    // Constraint types ('L' for ≤, 'E' for =)
+    // Apribojimu tipai, Cia rasom L jeigu <=, < jeigu < arba E jeigu =
+    // pvz 2x1 + 4x2 <= 8 yra L
     vector<char> constraint_types = { 'L', 'L', 'L' };
 
-    // Create and solve
-    KarmarkarSolver solver(0.5, 1e-6, 1000);
-    solver.setupProblem(A_orig, b_orig, c_orig, constraint_types);
+    // iki dabar visas pasiruosimas identiskas tiesinio programavimo simpleksui.
 
-    bool success = solver.solve();
+    Affinine Aff(0.5, 1e-6, 1000);
+    Aff.setupProblem(A, Res, coeffs, constraint_types);
+
+    bool success = Aff.solve();
 
     if (success) {
-        solver.printSolution();
+        Aff.printSolution();
     }
     else {
-        cout << "Algorithm did not converge to optimal solution." << endl;
-        cout << "Current best solution:" << endl;
-        solver.printSolution();
+        cout << "No Optimal,\n";
+        cout << "Reached feasible solution:\n";
+        Aff.printSolution();
     }
 
     return 0;
