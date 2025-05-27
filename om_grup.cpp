@@ -7,7 +7,7 @@
 using namespace Eigen;
 using namespace std;
 
-# Comment
+int coolVar;
 
 class KarmarkarSolver {
 private:
