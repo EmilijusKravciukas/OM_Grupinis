@@ -30,27 +30,28 @@ void Affinine::setupProblem(const MatrixXd& A_orig, const VectorXd& b_orig, cons
 
 void Affinine::initFeasiblePoint() {
     int n = A.cols();
-    x = VectorXd::Constant(n, 1.0);
 
-    for (int iter = 0; iter < 100; ++iter) {
-        VectorXd Ax = A * x;
-        VectorXd violation = Ax - b;
+    // Start with a better initial point - use constraint bounds
+    x = VectorXd::Zero(n);
 
-        if (violation.maxCoeff() <= epsilon) {
-            cout << "Starting point found after " << iter << " iterations." << endl;
-            return;
-        }
-
-        //Idealiai gauname pazeidimu vektoriu, kuri atemus is x vektoriaus gausime reiksmes, kurios neturi pazeidimu, tokiu atveju toliau seka skaiciavimai su matrica A.
-        VectorXd adjustment = A.transpose() * ((A * A.transpose()).ldlt().solve(violation));
-        x -= adjustment;
-
-        for (int i = 0; i < x.size(); ++i) {
-            if (x(i) <= 0) x(i) = 1e-3;
-        }
+    // Set original variables to reasonable values
+    int orig_vars = c.size() - A.rows();
+    for (int i = 0; i < orig_vars; i++) {
+        x(i) = min(10.0, b.minCoeff() * 0.1); // More aggressive initial point
     }
 
-    cout << "Warning: Could not find a strictly feasible point. Proceeding with best effort." << endl;
+    // Calculate slack variables
+    VectorXd Ax = A.leftCols(orig_vars) * x.head(orig_vars);
+    for (int i = 0; i < A.rows(); i++) {
+        x(orig_vars + i) = max(1.0, b(i) - Ax(i)); // Set slack to remaining capacity
+    }
+
+    cout << "Initial feasible point found." << endl;
+    cout << "Initial constraint satisfaction:" << endl;
+    VectorXd check = A * x;
+    for (int i = 0; i < check.size(); i++) {
+        cout << "  " << check(i) << " <= " << b(i) << endl;
+    }
 }
 
 // Compute steepest descent direction in transformed space
@@ -89,53 +90,60 @@ bool Affinine::solve() {
     cout << "Initial point: " << x.transpose() << endl;
     cout << "Initial objective value: " << c.dot(x) << endl << endl;
 
+    double prev_obj = c.dot(x);
+
     for (int k = 0; k < max_iterations; k++) {
-        // Check convergence
-        VectorXd constraint_violation = A * x - b;
-        double max_violation = constraint_violation.cwiseAbs().maxCoeff();
-
-        if (max_violation > 1e-3) {
-            cout << "Warning: Constraint violation = " << max_violation << endl;
-        }
-
         // Compute descent direction in transformed space
         VectorXd direction = computeDescentDirection(x);
 
         // Check stopping criterion
         double direction_norm = direction.norm();
         if (direction_norm < epsilon) {
-            cout << "Converged after " << k << " iterations." << endl;
+            cout << "Converged due to small direction norm after " << k << " iterations." << endl;
             cout << "Final objective value: " << c.dot(x) << endl;
             return true;
         }
 
-        VectorXd step = x.asDiagonal() * direction;
+        // Compute step size to maintain feasibility
+        double alpha = gamma; // Start with default step size
 
-        // Compute maximum safe step to stay in feasible region
-        double alpha = 1.0;
-        for (int i = 0; i < x.size(); ++i) {
-            if (step(i) < 0) {
-                alpha = std::min(alpha, -0.99 * x(i) / step(i));
+
+        // Take the step (proper affine scaling step)
+        VectorXd x_new = x + alpha * x.cwiseProduct(direction);
+
+        // Ensure all variables remain strictly positive
+        for (int i = 0; i < x_new.size(); ++i) {
+            if (x_new(i) <= 1e-8) {
+                x_new(i) = 1e-8;
             }
         }
 
-        VectorXd x_new = x + std::min(gamma, alpha) * step;
-
-        // Ensure feasibility and positivity
-        double min_val = x_new.minCoeff();
-        if (min_val <= 0) {
-            double alpha = 0.99 * x.cwiseQuotient(-direction).minCoeff();
-            if (alpha > 0 && alpha < gamma) {
-                x_new = x + alpha * x.cwiseProduct(direction);
+        // Check constraint feasibility
+        VectorXd Ax_new = A * x_new;
+        bool feasible = true;
+        for (int i = 0; i < b.size(); ++i) {
+            if (Ax_new(i) > b(i) + epsilon) {
+                feasible = false;
+                break;
             }
         }
 
         x = x_new;
+        double current_obj = c.dot(x);
+
+        // Additional convergence check based on objective improvement
+        if (abs(current_obj - prev_obj) < epsilon && k > 10) {
+            cout << "Converged due to small objective change after " << k << " iterations." << endl;
+            cout << "Final objective value: " << current_obj << endl;
+            return true;
+        }
+
+        prev_obj = current_obj;
 
         if (k % 10 == 0) {
             cout << "Iteration " << k << ": ";
-            cout << "Objective = " << fixed << setprecision(6) << c.dot(x);
-            cout << ", Direction norm = " << direction_norm << endl;
+            cout << "Objective = " << fixed << setprecision(6) << current_obj;
+            cout << ", Step size = " << alpha << endl;
         }
     }
 
