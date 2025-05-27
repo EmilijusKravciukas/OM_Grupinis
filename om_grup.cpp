@@ -7,8 +7,6 @@
 using namespace Eigen;
 using namespace std;
 
-int coolVar;
-
 class KarmarkarSolver {
 private:
     MatrixXd A;
