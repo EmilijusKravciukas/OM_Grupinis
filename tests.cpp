@@ -139,9 +139,6 @@ int main() {
       vector<char> ct7 = {'L', 'L'};
 
 
-      runAffineScale("Test", A2, b2, c2, ct2);
-      runSimplexTest("Test", A2, b2, c2);
-
       int userInput;
       cin>>userInput;
 
@@ -149,34 +146,42 @@ int main() {
             case 1:
                   runAffineScale("Test", A1, b1, c1, ct1);
                   runSimplexTest("Test", A1, b1, c1);
+                  break;
 
             case 2:
                   runAffineScale("Test", A2, b2, c2, ct2);
                   runSimplexTest("Test", A2, b2, c2);
                   
+                  break;
             case 3:
                   runAffineScale("Test", A3, b3, c3, ct3);
                   runSimplexTest("Test", A3, b3, c3);
 
+                  break;
             case 4:
                   runAffineScale("Test", A4, b4, c4, ct4);
                   runSimplexTest("Test", A4, b4, c4);
 
-            case 5:
+                  break;
+            case 5: // This one
                   runAffineScale("Test", A5, b5, c5, ct5);
                   runSimplexTest("Test", A5, b5, c5);
 
+                  break;
             case 6:
                   runAffineScale("Test", A6, b6, c6, ct6);
                   runSimplexTest("Test", A6, b6, c6);
 
+                  break;
             case 7:
                   runAffineScale("Test", A7, b7, c7, ct7);
                   runSimplexTest("Test", A7, b7, c7);
                   
+                  break;
             case 0:
                   runAffineScale("Test", A0, b0, c0, ct0);
                   runSimplexTest("Test", A0, b0, c0);
+                  break;
       }
 
       return 0;
